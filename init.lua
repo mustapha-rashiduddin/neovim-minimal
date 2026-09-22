@@ -2,11 +2,26 @@ vim.opt.clipboard = "unnamedplus"
 vim.opt.termbidi = true
 vim.opt.completeopt = { "menuone", "noselect", "popup" }
 
+vim.g.mapleader = ","
+vim.g.NERDSpaceDelims = 1
+vim.cmd.packadd("nerdcommenter")
+
 -- .v is ambiguous with Verilog; this setup uses it for Rocq sources.
 vim.filetype.add({
   extension = {
     v = "coq",
   },
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  group = vim.api.nvim_create_augroup("rocq-settings", { clear = true }),
+  pattern = "coq",
+  callback = function(event)
+    vim.bo[event.buf].expandtab = true
+    vim.bo[event.buf].shiftwidth = 2
+    vim.bo[event.buf].softtabstop = 2
+    vim.bo[event.buf].tabstop = 2
+  end,
 })
 
 vim.diagnostic.config({
@@ -24,6 +39,23 @@ vim.diagnostic.config({
 })
 
 local lsp_group = vim.api.nvim_create_augroup("native-lsp", { clear = true })
+
+-- coq-lsp only advertises "\\" as a completion trigger. Start Neovim's
+-- keyword completion while identifiers are typed so it behaves like Ctrl-N.
+vim.api.nvim_create_autocmd("InsertCharPre", {
+  group = lsp_group,
+  callback = function(event)
+    if vim.bo[event.buf].filetype ~= "coq"
+        or vim.fn.pumvisible() == 1
+        or vim.fn.state("m") == "m" then
+      return
+    end
+
+    if vim.v.char == "'" or vim.fn.match(vim.v.char, [[\k]]) >= 0 then
+      vim.api.nvim_feedkeys(vim.keycode("<C-n>"), "m", false)
+    end
+  end,
+})
 
 vim.api.nvim_create_autocmd("LspAttach", {
   group = lsp_group,

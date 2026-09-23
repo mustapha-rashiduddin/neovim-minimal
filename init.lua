@@ -15,12 +15,30 @@ vim.filetype.add({
   },
 })
 
+local config_dir = vim.fn.stdpath("config")
+local rocq_completion_sources = {
+  { path = config_dir .. "/dict/rocq-commands", menu = "[Command]" },
+  { path = config_dir .. "/dict/rocq-tactics", menu = "[Tactic]" },
+  { path = config_dir .. "/dict/rocq-keywords", menu = "[Keyword]" },
+  { path = config_dir .. "/dict/rocq-core", menu = "[Core]" },
+}
+local rocq_dictionary, rocq_dictionary_menu, rocq_dictionary_paths = {}, {}, {}
+for _, source in ipairs(rocq_completion_sources) do
+  table.insert(rocq_dictionary_paths, source.path)
+  for _, word in ipairs(vim.fn.readfile(source.path)) do
+    if not rocq_dictionary_menu[word] then
+      rocq_dictionary_menu[word] = source.menu
+      table.insert(rocq_dictionary, word)
+    end
+  end
+end
+
 vim.api.nvim_create_autocmd("FileType", {
   group = vim.api.nvim_create_augroup("rocq-settings", { clear = true }),
   pattern = "coq",
   callback = function(event)
     vim.opt_local.complete:append("k")
-    vim.bo[event.buf].dictionary = vim.fn.stdpath("config") .. "/dict/rocq"
+    vim.bo[event.buf].dictionary = table.concat(rocq_dictionary_paths, ",")
     vim.bo[event.buf].expandtab = true
     vim.bo[event.buf].shiftwidth = 2
     vim.bo[event.buf].softtabstop = 2
@@ -43,11 +61,6 @@ vim.diagnostic.config({
 })
 
 local lsp_group = vim.api.nvim_create_augroup("native-lsp", { clear = true })
-local rocq_dictionary = vim.fn.readfile(vim.fn.stdpath("config") .. "/dict/rocq")
-local rocq_dictionary_set = {}
-for _, word in ipairs(rocq_dictionary) do
-  rocq_dictionary_set[word] = true
-end
 local keyword_completion_scheduled = {}
 
 local function complete_rocq_keywords(bufnr)
@@ -79,11 +92,11 @@ local function complete_rocq_keywords(bufnr)
 
   for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
     for word in line:gmatch("[%a_][%w_']*") do
-      add(word, rocq_dictionary_set[word] and "[Rocq]" or "[Buffer]")
+      add(word, rocq_dictionary_menu[word] or "[Buffer]")
     end
   end
   for _, word in ipairs(rocq_dictionary) do
-    add(word, "[Rocq]")
+    add(word, rocq_dictionary_menu[word])
   end
 
   if #items > 0 then

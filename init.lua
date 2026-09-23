@@ -44,6 +44,10 @@ vim.diagnostic.config({
 
 local lsp_group = vim.api.nvim_create_augroup("native-lsp", { clear = true })
 local rocq_dictionary = vim.fn.readfile(vim.fn.stdpath("config") .. "/dict/rocq")
+local rocq_dictionary_set = {}
+for _, word in ipairs(rocq_dictionary) do
+  rocq_dictionary_set[word] = true
+end
 local keyword_completion_scheduled = {}
 
 local function complete_rocq_keywords(bufnr)
@@ -75,7 +79,7 @@ local function complete_rocq_keywords(bufnr)
 
   for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
     for word in line:gmatch("[%a_][%w_']*") do
-      add(word, "[Buffer]")
+      add(word, rocq_dictionary_set[word] and "[Rocq]" or "[Buffer]")
     end
   end
   for _, word in ipairs(rocq_dictionary) do

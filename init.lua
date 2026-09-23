@@ -43,20 +43,65 @@ vim.diagnostic.config({
 })
 
 local lsp_group = vim.api.nvim_create_augroup("native-lsp", { clear = true })
+local rocq_dictionary = vim.fn.readfile(vim.fn.stdpath("config") .. "/dict/rocq")
+local keyword_completion_scheduled = {}
+
+local function complete_rocq_keywords(bufnr)
+  keyword_completion_scheduled[bufnr] = nil
+  if
+    not vim.api.nvim_buf_is_valid(bufnr)
+    or vim.api.nvim_get_current_buf() ~= bufnr
+    or not vim.api.nvim_get_mode().mode:match("^i")
+    or vim.fn.pumvisible() == 1
+  then
+    return
+  end
+
+  local cursor_col = vim.api.nvim_win_get_cursor(0)[2]
+  local line_to_cursor = vim.api.nvim_get_current_line():sub(1, cursor_col)
+  local prefix = line_to_cursor:match("[%w_']+$")
+  if not prefix then return end
+
+  local ignore_case = vim.o.ignorecase and (not vim.o.smartcase or not prefix:find("%u"))
+  local match_prefix = ignore_case and prefix:lower() or prefix
+  local seen, items = {}, {}
+  local function add(word, menu)
+    local match_word = ignore_case and word:lower() or word
+    if word ~= prefix and not seen[word] and vim.startswith(match_word, match_prefix) then
+      seen[word] = true
+      table.insert(items, { word = word, menu = menu, icase = ignore_case and 1 or 0 })
+    end
+  end
+
+  for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
+    for word in line:gmatch("[%a_][%w_']*") do
+      add(word, "[Buffer]")
+    end
+  end
+  for _, word in ipairs(rocq_dictionary) do
+    add(word, "[Rocq]")
+  end
+
+  if #items > 0 then
+    vim.fn.complete(cursor_col - #prefix + 1, items)
+  end
+end
 
 -- coq-lsp only advertises "\\" as a completion trigger. Start Neovim's
--- keyword completion while identifiers are typed so it behaves like Ctrl-N.
+-- buffer and Rocq keyword completion while identifiers are typed.
 vim.api.nvim_create_autocmd("InsertCharPre", {
   group = lsp_group,
   callback = function(event)
     if vim.bo[event.buf].filetype ~= "coq"
         or vim.fn.pumvisible() == 1
+        or keyword_completion_scheduled[event.buf]
         or vim.fn.state("m") == "m" then
       return
     end
 
     if vim.v.char == "'" or vim.fn.match(vim.v.char, [[\k]]) >= 0 then
-      vim.api.nvim_feedkeys(vim.keycode("<C-n>"), "m", false)
+      keyword_completion_scheduled[event.buf] = true
+      vim.schedule(function() complete_rocq_keywords(event.buf) end)
     end
   end,
 })

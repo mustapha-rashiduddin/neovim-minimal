@@ -1,4 +1,6 @@
 vim.opt.clipboard = "unnamedplus"
+vim.opt.ignorecase = true
+vim.opt.smartcase = true
 vim.opt.termbidi = true
 vim.opt.completeopt = { "menuone", "noselect", "popup" }
 
@@ -17,6 +19,8 @@ vim.api.nvim_create_autocmd("FileType", {
   group = vim.api.nvim_create_augroup("rocq-settings", { clear = true }),
   pattern = "coq",
   callback = function(event)
+    vim.opt_local.complete:append("k")
+    vim.bo[event.buf].dictionary = vim.fn.stdpath("config") .. "/dict/rocq"
     vim.bo[event.buf].expandtab = true
     vim.bo[event.buf].shiftwidth = 2
     vim.bo[event.buf].softtabstop = 2

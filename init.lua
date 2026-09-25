@@ -7,6 +7,7 @@ vim.opt.completeopt = { "menuone", "noselect", "popup" }
 vim.g.mapleader = ","
 vim.g.NERDSpaceDelims = 1
 vim.cmd.packadd("nerdcommenter")
+vim.cmd.packadd("leap.nvim")
 
 -- .v is ambiguous with Verilog; this setup uses it for Rocq sources.
 vim.filetype.add({
@@ -59,6 +60,18 @@ vim.diagnostic.config({
     source = true,
   },
 })
+
+-- Motion: leap.nvim, a multifill-style two-character search across the screen.
+-- preview = false drops leap's extra filtering phase, so the labels drawn after
+-- the first keypress are immediately selectable.
+require("leap").opts.preview = false
+
+-- inputlen = 1 makes labels live right after the first character: `,s` `e`
+-- labels every `e` on screen and the next keypress jumps. The default of 2
+-- would read that keypress as the pattern's second character instead.
+vim.keymap.set({ "n", "x" }, "<leader>s", function()
+  require("leap").leap { windows = { vim.fn.win_getid() }, inclusive = true, inputlen = 1 }
+end, { desc = "Leap to pattern" })
 
 local lsp_group = vim.api.nvim_create_augroup("native-lsp", { clear = true })
 local keyword_completion_scheduled = {}

@@ -61,17 +61,25 @@ vim.diagnostic.config({
   },
 })
 
--- Motion: leap.nvim, a multifill-style two-character search across the screen.
--- preview = false drops leap's extra filtering phase, so the labels drawn after
--- the first keypress are immediately selectable.
-require("leap").opts.preview = false
+-- Motion: leap.nvim. `<leader>s` then one character labels every occurrence
+-- of it in the window; press a label to jump there.
+--
+-- The character is read here and handed to leap as a literal pattern. leap's
+-- own `inputlen = 1` mode only matches a character that is *not* followed by
+-- another one, so a run like "llll" yields a single target on the last char.
+local leap = require("leap")
 
--- inputlen = 1 makes labels live right after the first character: `,s` `e`
--- labels every `e` on screen and the next keypress jumps. The default of 2
--- would read that keypress as the pattern's second character instead.
-vim.keymap.set({ "n", "x" }, "<leader>s", function()
-  require("leap").leap { windows = { vim.fn.win_getid() }, inclusive = true, inputlen = 1 }
-end, { desc = "Leap to pattern" })
+local function leap_to_char()
+  local char = vim.fn.getcharstr()
+  if char == "" or char == "\27" then return end
+  leap.leap {
+    pattern = "\\V" .. vim.pesc(char),
+    windows = { vim.fn.win_getid() },
+    inclusive = true,
+  }
+end
+
+vim.keymap.set({ "n", "x" }, "<leader>s", leap_to_char, { desc = "Leap to character" })
 
 local lsp_group = vim.api.nvim_create_augroup("native-lsp", { clear = true })
 local keyword_completion_scheduled = {}

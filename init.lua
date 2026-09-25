@@ -6,8 +6,20 @@ vim.opt.completeopt = { "menuone", "noselect", "popup" }
 
 vim.g.mapleader = ","
 vim.g.NERDSpaceDelims = 1
-vim.cmd.packadd("nerdcommenter")
-vim.cmd.packadd("leap.nvim")
+
+-- Plugins live outside this repo; a fresh clone needs install.sh to have run.
+-- Load them tolerantly so a missing plugin degrades one feature instead of
+-- aborting the rest of the config.
+local function load_plugin(name)
+  if pcall(vim.cmd.packadd, name) then return true end
+  vim.schedule(function()
+    vim.notify(("plugin %q not installed - run install.sh"):format(name), vim.log.levels.WARN)
+  end)
+  return false
+end
+
+load_plugin("nerdcommenter")
+local has_leap = load_plugin("leap.nvim")
 
 -- .v is ambiguous with Verilog; this setup uses it for Rocq sources.
 vim.filetype.add({
@@ -64,16 +76,22 @@ vim.diagnostic.config({
 -- Motion: leap.nvim. `<leader>s` then one character labels every occurrence
 -- of it in the window; press a label to jump there.
 --
--- The character is read here and handed to leap as a literal pattern. leap's
--- own `inputlen = 1` mode only matches a character that is *not* followed by
--- another one, so a run like "llll" yields a single target on the last char.
-local leap = require("leap")
+-- The character is read here and handed to leap as a literal pattern, for two
+-- reasons:
+--   * leap's own `inputlen = 1` mode only matches a character that is *not*
+--     followed by another one, so a run like "llll" yields a single target.
+--   * `\V` (very nomagic) makes the pattern literal, so regex metacharacters
+--     such as `.` or `*` match themselves. Only a backslash still needs
+--     escaping; `vim.pesc` must not be used here, since its `%.`-style
+--     escapes are literal under `\V` and would never match.
+local leap = has_leap and require("leap") or nil
 
 local function leap_to_char()
+  if not leap then return end
   local char = vim.fn.getcharstr()
   if char == "" or char == "\27" then return end
   leap.leap {
-    pattern = "\\V" .. vim.pesc(char),
+    pattern = char == "\\" and "\\V\\\\" or "\\V" .. char,
     windows = { vim.fn.win_getid() },
     inclusive = true,
   }

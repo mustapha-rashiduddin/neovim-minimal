@@ -33,6 +33,17 @@ leap.nvim moved to Codeberg; the GitHub repository of the same name is dead.
 | ------ | ----------------------------------------------- |
 | `,s`   | leap: type a character, then a label to jump    |
 
+`,s` takes exactly one character and labels **every** occurrence of it in the
+window, including runs like `llll`. Press a label to jump to that match.
+
+- The character is matched literally, so regex metacharacters (`.`, `*`, `[`,
+  `\`, ...) match themselves.
+- With few enough matches, leap jumps to the nearest one instead of labeling.
+- With more matches than labels, `<space>` and `<backspace>` page through them.
+- `Escape` cancels.
+
+Works in normal and visual mode.
+
 ## Theme
 
 `theme.lua` holds the colorscheme name (`"light"` or `"dark"`). `init.lua`

@@ -86,6 +86,15 @@ vim.diagnostic.config({
 --     escapes are literal under `\V` and would never match.
 local leap = has_leap and require("leap") or nil
 
+if leap then
+  -- Lowercase-only labels. The default pool is lowercase *then* uppercase, so
+  -- a screen with many matches starts handing out capitals, which is awkward
+  -- to hit. 26 letters is enough for one screenful; `?` is the overflow label
+  -- leap itself appends for group switching.
+  leap.opts.labels = "abcdefghijklmnopqrstuvwxyz?"
+  leap.opts.safe_labels = "sfnut"
+end
+
 local function leap_to_char()
   if not leap then return end
   local char = vim.fn.getcharstr()

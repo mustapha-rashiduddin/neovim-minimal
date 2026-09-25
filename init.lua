@@ -192,6 +192,8 @@ local function apply_theme(c)
     vim.o.background = "dark"
   end
   pcall(vim.cmd.colorscheme, scheme)
+  local comment_fg = name == "light" and "#4b5563" or "#9ca3af"
+  vim.api.nvim_set_hl(0, "Comment", { fg = comment_fg })
 end
 
 local function read_theme()

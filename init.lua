@@ -74,7 +74,8 @@ vim.diagnostic.config({
 })
 
 -- Motion: leap.nvim. `<leader>s` then one character labels every occurrence
--- of it in the window; press a label to jump there.
+-- of it in the window; press a label to jump there. A lone occurrence is
+-- jumped to right away.
 --
 -- The character is read here and handed to leap as a literal pattern, for two
 -- reasons:
@@ -95,14 +96,35 @@ if leap then
   leap.opts.safe_labels = "sfnut"
 end
 
+-- Number of occurrences of `pattern` in `win`, as leap itself counts them.
+-- `leap.search` is the only private module this leans on, hence the pcall:
+-- if it ever disappears, we fall back to leap's own autojump heuristic.
+local function leap_match_count(pattern, win)
+  local ok, search = pcall(require, "leap.search")
+  if not ok then return nil end
+  local targets = search.get_targets(pattern, { windows = { win }, inputlen = 0 })
+  return targets and #targets or 0
+end
+
 local function leap_to_char()
   if not leap then return end
   local char = vim.fn.getcharstr()
   if char == "" or char == "\27" then return end
+  local pattern = char == "\\" and "\\V\\\\" or "\\V" .. char
+  local win = vim.api.nvim_get_current_win()
+
+  -- leap autojumps to the nearest target whenever every *other* target still
+  -- fits in `safe_labels`, which means a handful of matches on screen makes it
+  -- jump and label the rest -- the choice is made for us. Autojump is only
+  -- wanted when the match is unambiguous, so with two or more occurrences we
+  -- blank out `safe_labels`, which leaves leap no reason to autojump and makes
+  -- it label every match instead.
+  local n = leap_match_count(pattern, win)
   leap.leap {
-    pattern = char == "\\" and "\\V\\\\" or "\\V" .. char,
-    windows = { vim.fn.win_getid() },
+    pattern = pattern,
+    windows = { win },
     inclusive = true,
+    opts = (n and n > 1) and { safe_labels = "" } or nil,
   }
 end
 

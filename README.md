@@ -40,7 +40,9 @@ window, including runs like `llll`. Press a label to jump to that match.
   `\`, ...) match themselves.
 - Labels are lowercase only, `a` to `z` plus `?`. leap's default pool adds
   capitals once a screen has many matches; this keeps every label lowercase.
-- With few enough matches, leap jumps to the nearest one instead of labeling.
+- With exactly one occurrence on screen (the one under the cursor doesn't
+  count), leap jumps to it right away.
+- With two or more, all of them are labeled and nothing is jumped to for you.
 - With more matches than labels, `<space>` and `<backspace>` page through them.
 - `Escape` cancels.
 

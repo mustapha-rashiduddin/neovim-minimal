@@ -160,37 +160,12 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
 vim.lsp.config("rust_analyzer", {
   cmd = { "rust-analyzer" },
-  -- rust-analyzer 2025-10-28 shells out to `cargo`, and ~/.cargo/bin/cargo is a
-  -- shim that strips nightly-only flags (--lockfile-path, -Zunstable-options,
-  -- --compile-time-deps) that stable cargo rejects. Set PATH explicitly so the
-  -- shim is found no matter how Neovim was launched; otherwise a GUI/desktop
-  -- launch without ~/.cargo/bin in PATH fails `cargo check` and rust-analyzer
-  -- reports "Failed to run build scripts of some packages".
-  --
-  -- CARGO_TARGET_DIR matters too: the Nix wrapper exports RUST_SRC_PATH into the
-  -- read-only /nix/store, so the target dir cargo derives for the sysroot build
-  -- is not writable (EROFS). Redirect it somewhere writable.
-  cmd_env = {
-    PATH = vim.fn.expand("~/.cargo/bin") .. ":" .. (vim.env.PATH or ""),
-    CARGO_TARGET_DIR = vim.fn.stdpath("cache") .. "/rust-analyzer-target",
-  },
   filetypes = { "rust" },
   root_markers = { "Cargo.toml", "rust-project.json", ".git" },
   settings = {
     ["rust-analyzer"] = {
       checkOnSave = false,
-      -- buildScripts stays off: the Nix rust-analyzer wrapper points RUST_SRC_PATH
-      -- into the read-only /nix/store, so building build scripts fails with EROFS
-      -- and pops a "Failed to run build scripts" warning on every load.
-      -- The Nix rust-analyzer wrapper exports RUST_SRC_PATH into the read-only
-      -- /nix/store, so the cargo target dir rust-analyzer picks for the sysroot
-      -- lands on a read-only path and every load reports
-      -- "Failed to run build scripts of some packages". Force a writable one.
-      cargo = {
-        allFeatures = true,
-        targetDir = vim.fn.stdpath("cache") .. "/rust-analyzer-target",
-        buildScripts = { enable = false },
-      },
+      cargo = { allFeatures = true },
       procMacro = { enable = true },
       completion = {
         autoimport = { enable = true },

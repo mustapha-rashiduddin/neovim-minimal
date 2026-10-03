@@ -25,44 +25,6 @@ end
 load_plugin("nerdcommenter")
 local has_leap = load_plugin("leap.nvim")
 
--- .v is ambiguous with Verilog; this setup uses it for Rocq sources.
-vim.filetype.add({
-  extension = {
-    v = "coq",
-  },
-})
-
-local config_dir = vim.fn.stdpath("config")
-local rocq_completion_sources = {
-  { path = config_dir .. "/dict/rocq-commands", menu = "[Command]" },
-  { path = config_dir .. "/dict/rocq-tactics", menu = "[Tactic]" },
-  { path = config_dir .. "/dict/rocq-keywords", menu = "[Keyword]" },
-  { path = config_dir .. "/dict/rocq-core", menu = "[Core]" },
-}
-local rocq_dictionary, rocq_dictionary_menu, rocq_dictionary_paths = {}, {}, {}
-for _, source in ipairs(rocq_completion_sources) do
-  table.insert(rocq_dictionary_paths, source.path)
-  for _, word in ipairs(vim.fn.readfile(source.path)) do
-    if not rocq_dictionary_menu[word] then
-      rocq_dictionary_menu[word] = source.menu
-      table.insert(rocq_dictionary, word)
-    end
-  end
-end
-
-vim.api.nvim_create_autocmd("FileType", {
-  group = vim.api.nvim_create_augroup("rocq-settings", { clear = true }),
-  pattern = "coq",
-  callback = function(event)
-    vim.opt_local.complete:append("k")
-    vim.bo[event.buf].dictionary = table.concat(rocq_dictionary_paths, ",")
-    vim.bo[event.buf].expandtab = true
-    vim.bo[event.buf].shiftwidth = 2
-    vim.bo[event.buf].softtabstop = 2
-    vim.bo[event.buf].tabstop = 2
-  end,
-})
-
 vim.diagnostic.config({
   severity_sort = true,
   signs = true,
@@ -135,75 +97,42 @@ end
 vim.keymap.set({ "n", "x" }, "<leader>s", leap_to_char, { desc = "Leap to character" })
 
 local lsp_group = vim.api.nvim_create_augroup("native-lsp", { clear = true })
-local keyword_completion_scheduled = {}
-
-local function complete_rocq_keywords(bufnr)
-  keyword_completion_scheduled[bufnr] = nil
-  if
-    not vim.api.nvim_buf_is_valid(bufnr)
-    or vim.api.nvim_get_current_buf() ~= bufnr
-    or not vim.api.nvim_get_mode().mode:match("^i")
-    or vim.fn.pumvisible() == 1
-  then
-    return
-  end
-
-  local cursor_col = vim.api.nvim_win_get_cursor(0)[2]
-  local line_to_cursor = vim.api.nvim_get_current_line():sub(1, cursor_col)
-  local prefix = line_to_cursor:match("[%w_']+$")
-  if not prefix then return end
-
-  local ignore_case = vim.o.ignorecase and (not vim.o.smartcase or not prefix:find("%u"))
-  local match_prefix = ignore_case and prefix:lower() or prefix
-  local seen, items = {}, {}
-  local function add(word, menu)
-    local match_word = ignore_case and word:lower() or word
-    if word ~= prefix and not seen[word] and vim.startswith(match_word, match_prefix) then
-      seen[word] = true
-      table.insert(items, { word = word, menu = menu, icase = ignore_case and 1 or 0 })
-    end
-  end
-
-  for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
-    for word in line:gmatch("[%a_][%w_']*") do
-      add(word, rocq_dictionary_menu[word] or "[Buffer]")
-    end
-  end
-  for _, word in ipairs(rocq_dictionary) do
-    add(word, rocq_dictionary_menu[word])
-  end
-
-  if #items > 0 then
-    vim.fn.complete(cursor_col - #prefix + 1, items)
-  end
-end
-
--- coq-lsp only advertises "\\" as a completion trigger. Start Neovim's
--- buffer and Rocq keyword completion while identifiers are typed.
-vim.api.nvim_create_autocmd("InsertCharPre", {
-  group = lsp_group,
-  callback = function(event)
-    if vim.bo[event.buf].filetype ~= "coq"
-        or vim.fn.pumvisible() == 1
-        or keyword_completion_scheduled[event.buf]
-        or vim.fn.state("m") == "m" then
-      return
-    end
-
-    if vim.v.char == "'" or vim.fn.match(vim.v.char, [[\k]]) >= 0 then
-      keyword_completion_scheduled[event.buf] = true
-      vim.schedule(function() complete_rocq_keywords(event.buf) end)
-    end
-  end,
-})
-
 vim.api.nvim_create_autocmd("LspAttach", {
   group = lsp_group,
   callback = function(event)
     local client = vim.lsp.get_client_by_id(event.data.client_id)
     if not client then return end
 
-    vim.lsp.completion.enable(true, client.id, event.buf, { autotrigger = true })
+    -- rust-analyzer labels macro/function candidates with a "(…)" placeholder,
+    -- e.g. "println!(…)". That "…" is a 3-byte UTF-8 character, so Neovim's
+    -- #label (13) compares greater than the parsed snippet "println!()" (10)
+    -- and it derives the inserted word as matchstr(text, '\k*') -- "println" --
+    -- silently dropping the "!". Supply the word ourselves from filterText,
+    -- which rust-analyzer sets to the real identifier ("println!").
+    --
+    -- autotrigger only fires on the server's advertised triggerCharacters
+    -- (":", ".", "'", "(" for rust-analyzer), never plain letters, so ask for
+    -- completion as the user types instead.
+    vim.lsp.completion.enable(true, client.id, event.buf, {
+      autotrigger = true,
+      convert = function(item)
+        local word = item.filterText
+        if type(word) ~= "string" or word == "" then
+          local label = item.label or ""
+          word = label:gsub("%s*%b()%s*$", "")
+        end
+        return { word = word, abbr = item.label }
+      end,
+    })
+
+    vim.api.nvim_create_autocmd("TextChangedI", {
+      group = lsp_group,
+      buffer = event.buf,
+      callback = function()
+        if vim.fn.pumvisible() == 1 or vim.snippet.active() then return end
+        vim.lsp.completion.get()
+      end,
+    })
 
     local function map(mode, lhs, rhs, desc, opts)
       vim.keymap.set(mode, lhs, rhs, vim.tbl_extend("force", {
@@ -254,13 +183,6 @@ vim.api.nvim_create_autocmd("LspAttach", {
   end,
 })
 
-vim.lsp.config("rocq_lsp", {
-  cmd = { "coq-lsp" },
-  filetypes = { "coq" },
-  root_markers = { "_RocqProject", "_CoqProject", ".git" },
-})
-
-vim.lsp.enable("rocq_lsp")
 
 
 vim.lsp.config("rust_analyzer", {

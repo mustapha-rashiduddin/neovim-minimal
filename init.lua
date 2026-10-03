@@ -226,12 +226,20 @@ vim.api.nvim_create_autocmd("LspAttach", {
     map("n", "]d", function() vim.diagnostic.jump({ count = 1, float = true }) end, "Next diagnostic")
     map("n", "<leader>e", vim.diagnostic.open_float, "Show diagnostic")
 
-    map("i", "<Tab>", function()
-      return vim.fn.pumvisible() == 1 and "<C-n>" or "<Tab>"
-    end, "Select next completion", { expr = true })
-    map("i", "<S-Tab>", function()
-      return vim.fn.pumvisible() == 1 and "<C-p>" or "<S-Tab>"
-    end, "Select previous completion", { expr = true })
+    -- Cycle/accept completion. C-n and C-p drive the menu; Tab and S-Tab mirror
+    -- them so you can cycle without leaving home row. When no menu is open these
+    -- fall through to their literal key so they stay usable in strings.
+    local function cycle(keys, popup_key, literal)
+      return function()
+        if vim.fn.pumvisible() == 1 then return popup_key end
+        return literal or keys
+      end
+    end
+
+    map("i", "<C-n>", cycle("<C-n>", "<C-n>", "<C-x><C-u>"), "Next completion", { expr = true })
+    map("i", "<C-p>", cycle("<C-p>", "<C-p>"), "Previous completion", { expr = true })
+    map("i", "<Tab>", cycle("<Tab>", "<C-n>", "<Tab>"), "Select next completion", { expr = true })
+    map("i", "<S-Tab>", cycle("<S-Tab>", "<C-p>", "<S-Tab>"), "Select previous completion", { expr = true })
     map("i", "<CR>", function()
       local completion = vim.fn.complete_info({ "selected" })
       if vim.fn.pumvisible() == 1 and completion.selected ~= -1 then

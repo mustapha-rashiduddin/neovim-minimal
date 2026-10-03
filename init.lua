@@ -253,6 +253,13 @@ vim.lsp.enable("rocq_lsp")
 
 vim.lsp.config("rust_analyzer", {
   cmd = { "rust-analyzer" },
+  -- rust-analyzer 2025-10-28 shells out to `cargo`, and ~/.cargo/bin/cargo is a
+  -- shim that strips nightly-only flags (--lockfile-path, -Zunstable-options,
+  -- --compile-time-deps) that stable cargo rejects. Set PATH explicitly so the
+  -- shim is found no matter how Neovim was launched; otherwise a GUI/desktop
+  -- launch without ~/.cargo/bin in PATH fails `cargo check` and rust-analyzer
+  -- reports "Failed to run build scripts of some packages".
+  cmd_env = { PATH = vim.fn.expand("~/.cargo/bin") .. ":" .. (vim.env.PATH or "") },
   filetypes = { "rust" },
   root_markers = { "Cargo.toml", "rust-project.json", ".git" },
   settings = {

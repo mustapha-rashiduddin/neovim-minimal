@@ -26,6 +26,17 @@ load_plugin("nerdcommenter")
 local has_leap = load_plugin("leap.nvim")
 local has_blink = load_plugin("blink.cmp")
 
+-- Neovim's own Rust ftplugin does `setlocal formatoptions+=croqnl`. Two of those
+-- flags continue a `//` comment onto the line you open: "o" for the `o` command
+-- and "r" for <CR>. Drop both, keeping the rest of the ftplugin's settings, so a
+-- fresh line after a comment starts uncommented.
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "rust",
+  callback = function()
+    vim.opt_local.formatoptions:remove({ "o", "r" })
+  end,
+})
+
 vim.diagnostic.config({
   severity_sort = true,
   signs = true,

@@ -26,15 +26,14 @@ load_plugin("nerdcommenter")
 local has_leap = load_plugin("leap.nvim")
 local has_blink = load_plugin("blink.cmp")
 
--- Neovim's own Rust ftplugin does `setlocal formatoptions+=croqnl`. Two of those
--- flags continue a `//` comment onto the line you open: "o" for the `o` command
--- and "r" for <CR>. Drop both, keeping the rest of the ftplugin's settings, so a
--- fresh line after a comment starts uncommented.
+-- Several ftplugins set `formatoptions` flags that carry the comment leader onto
+-- the line you open -- "o" for the `o` command and "r" for <CR>. Neovim's Rust
+-- ftplugin, for one, runs `setlocal formatoptions+=croqnl`. Opening a new line
+-- off a comment should start uncommented, so drop both flags for every filetype.
+-- This runs after each ftplugin, and only these two flags are removed, so
+-- autoindent, auto-wrapping and the rest are left alone.
 vim.api.nvim_create_autocmd("FileType", {
-  pattern = "rust",
-  callback = function()
-    vim.opt_local.formatoptions:remove({ "o", "r" })
-  end,
+  callback = function() vim.opt_local.formatoptions:remove({ "o", "r" }) end,
 })
 
 vim.diagnostic.config({

@@ -24,6 +24,7 @@ end
 
 load_plugin("nerdcommenter")
 local has_leap = load_plugin("leap.nvim")
+local has_blink = load_plugin("blink.cmp")
 
 vim.diagnostic.config({
   severity_sort = true,
@@ -103,36 +104,8 @@ vim.api.nvim_create_autocmd("LspAttach", {
     local client = vim.lsp.get_client_by_id(event.data.client_id)
     if not client then return end
 
-    -- rust-analyzer labels macro/function candidates with a "(…)" placeholder,
-    -- e.g. "println!(…)". That "…" is a 3-byte UTF-8 character, so Neovim's
-    -- #label (13) compares greater than the parsed snippet "println!()" (10)
-    -- and it derives the inserted word as matchstr(text, '\k*') -- "println" --
-    -- silently dropping the "!". Supply the word ourselves from filterText,
-    -- which rust-analyzer sets to the real identifier ("println!").
-    --
-    -- autotrigger only fires on the server's advertised triggerCharacters
-    -- (":", ".", "'", "(" for rust-analyzer), never plain letters, so ask for
-    -- completion as the user types instead.
-    vim.lsp.completion.enable(true, client.id, event.buf, {
-      autotrigger = true,
-      convert = function(item)
-        local word = item.filterText
-        if type(word) ~= "string" or word == "" then
-          local label = item.label or ""
-          word = label:gsub("%s*%b()%s*$", "")
-        end
-        return { word = word, abbr = item.label }
-      end,
-    })
-
-    vim.api.nvim_create_autocmd("TextChangedI", {
-      group = lsp_group,
-      buffer = event.buf,
-      callback = function()
-        if vim.fn.pumvisible() == 1 or vim.snippet.active() then return end
-        vim.lsp.completion.get()
-      end,
-    })
+    -- Completion is owned by blink.cmp (configured below). Neovim's builtin LSP
+    -- completion source stays disabled so the two never compete.
 
     local function map(mode, lhs, rhs, desc, opts)
       vim.keymap.set(mode, lhs, rhs, vim.tbl_extend("force", {
@@ -227,9 +200,35 @@ vim.lsp.config("rust_analyzer", {
       semanticHighlighting = { strings = { enable = true } },
     },
   },
+  -- Tell rust-analyzer about blink's extra capabilities (snippets, signature
+  -- help) so it keeps sending parameterised insert text.
+  capabilities = has_blink and require("blink.cmp").get_lsp_capabilities() or nil,
 })
 
 vim.lsp.enable("rust_analyzer")
+
+-- blink.cmp: single-plugin completion engine. It replaces nvim-cmp plus the
+-- separate LuaSnip/cmp-nvim-lsp/cmp-buffer/cmp-path plugins, expands LSP
+-- snippets through the built-in vim.snippet, shows signature help, and inserts
+-- brackets from semantic tokens when you accept a function or macro.
+if has_blink then
+  require("blink.cmp").setup({
+    keymap = {
+      preset = "default",
+      -- Tab / S-Tab also walk the menu. "fallback_to_mappings" defers when no
+      -- menu is showing, which is what lets Tab still jump between snippet
+      -- placeholders (rust-analyzer sends one tabstop per parameter).
+      ["<Tab>"] = { "select_next", "fallback_to_mappings" },
+      ["<S-Tab>"] = { "select_prev", "fallback_to_mappings" },
+    },
+    appearance = { nerd_font_variant = "mono" },
+    completion = { documentation = { auto_show = false } },
+    sources = { default = { "lsp", "path", "snippets", "buffer" } },
+    -- "prefer_rust" uses the prebuilt fuzzy matcher when present and silently
+    -- falls back to the Lua implementation, so this works offline too.
+    fuzzy = { implementation = "prefer_rust" },
+  })
+end
 -- Theme: switch built-in colorscheme from theme.lua (morning/evening).
 -- Polls theme.lua so an already-open nvim updates live when `light`/`dark` runs.
 local THEME_FILE = vim.fn.expand("~/.config/nvim/theme.lua")

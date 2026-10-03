@@ -3,6 +3,10 @@ vim.opt.ignorecase = true
 vim.opt.smartcase = true
 vim.opt.termbidi = true
 vim.opt.completeopt = { "menuone", "noselect", "popup" }
+-- rust-analyzer fills completion `detail` with absolute source paths; without a
+-- cap the popup stretches the full screen width. Truncate instead.
+vim.opt.pumwidth = 70
+vim.opt.pumheight = 12
 
 vim.g.mapleader = ","
 vim.g.NERDSpaceDelims = 1
@@ -253,9 +257,16 @@ vim.lsp.config("rust_analyzer", {
   root_markers = { "Cargo.toml", "rust-project.json", ".git" },
   settings = {
     ["rust-analyzer"] = {
-      checkOnSave = { command = "clippy" },
-      cargo = { allFeatures = true, buildScripts = { enable = true } },
+      checkOnSave = false,
+      -- buildScripts stays off: the Nix rust-analyzer wrapper points RUST_SRC_PATH
+      -- into the read-only /nix/store, so building build scripts fails with EROFS
+      -- and pops a "Failed to run build scripts" warning on every load.
+      cargo = { allFeatures = true, buildScripts = { enable = false } },
       procMacro = { enable = true },
+      completion = {
+        autoimport = { enable = true },
+        fullFunctionSignatures = { enable = true },
+      },
       inlayHints = { enable = true },
       semanticHighlighting = { strings = { enable = true } },
     },

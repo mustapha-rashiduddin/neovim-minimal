@@ -226,23 +226,27 @@ vim.api.nvim_create_autocmd("LspAttach", {
     map("n", "]d", function() vim.diagnostic.jump({ count = 1, float = true }) end, "Next diagnostic")
     map("n", "<leader>e", vim.diagnostic.open_float, "Show diagnostic")
 
-    -- Cycle/accept completion. C-n and C-p drive the menu; Tab and S-Tab mirror
-    -- them so you can cycle without leaving home row. When no menu is open these
-    -- fall through to their literal key so they stay usable in strings.
-    local function cycle(keys, popup_key, literal)
+-- Cycle/accept completion. C-n and C-p drive the menu; Tab and S-Tab mirror
+    -- them so you can cycle without leaving home row. When no menu is open the
+    -- cycle keys fall through to their literal key so they stay usable in
+    -- strings, and C-n instead asks the LSP to open the menu.
+    local function cycle(when_open, literal, open_menu)
       return function()
-        if vim.fn.pumvisible() == 1 then return popup_key end
-        return literal or keys
+        if vim.fn.pumvisible() == 1 then return when_open end
+        if open_menu then
+          vim.lsp.completion.get()
+          return ""
+        end
+        return literal
       end
     end
 
-    map("i", "<C-n>", cycle("<C-n>", "<C-n>", "<C-x><C-u>"), "Next completion", { expr = true })
-    map("i", "<C-p>", cycle("<C-p>", "<C-p>"), "Previous completion", { expr = true })
-    map("i", "<Tab>", cycle("<Tab>", "<C-n>", "<Tab>"), "Select next completion", { expr = true })
-    map("i", "<S-Tab>", cycle("<S-Tab>", "<C-p>", "<S-Tab>"), "Select previous completion", { expr = true })
+    map("i", "<C-n>", cycle("<C-n>", "<C-n>", true), "Next completion")
+    map("i", "<C-p>", cycle("<C-p>", "<C-p>"), "Previous completion")
+    map("i", "<Tab>", cycle("<C-n>", "<Tab>"), "Select next completion")
+    map("i", "<S-Tab>", cycle("<C-p>", "<S-Tab>"), "Select previous completion")
     map("i", "<CR>", function()
-      local completion = vim.fn.complete_info({ "selected" })
-      if vim.fn.pumvisible() == 1 and completion.selected ~= -1 then
+      if vim.fn.pumvisible() == 1 and vim.fn.complete_info({ "selected" }).selected ~= -1 then
         return "<C-y>"
       end
       return "<CR>"

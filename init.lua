@@ -246,6 +246,23 @@ vim.lsp.config("rocq_lsp", {
 
 vim.lsp.enable("rocq_lsp")
 
+
+vim.lsp.config("rust_analyzer", {
+  cmd = { "rust-analyzer" },
+  filetypes = { "rust" },
+  root_markers = { "Cargo.toml", "rust-project.json", ".git" },
+  settings = {
+    ["rust-analyzer"] = {
+      checkOnSave = { command = "clippy" },
+      cargo = { allFeatures = true, buildScripts = { enable = true } },
+      procMacro = { enable = true },
+      inlayHints = { enable = true },
+      semanticHighlighting = { strings = { enable = true } },
+    },
+  },
+})
+
+vim.lsp.enable("rust_analyzer")
 -- Theme: switch built-in colorscheme from theme.lua (morning/evening).
 -- Polls theme.lua so an already-open nvim updates live when `light`/`dark` runs.
 local THEME_FILE = vim.fn.expand("~/.config/nvim/theme.lua")

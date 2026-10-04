@@ -107,6 +107,12 @@ end
 
 vim.keymap.set({ "n", "x" }, "<leader>s", leap_to_char, { desc = "Leap to character" })
 
+-- <C-w> closes the window. <C-A-h> is not an option here: no byte sequence
+-- encodes it, and a terminal sends ESC + 0x08, which Neovim reads as <Esc>
+-- then <C-H>. st implements neither modifyOtherKeys nor the kitty keyboard
+-- protocol, so Ctrl+Alt+letter can never be distinguished. Use the leader.
+vim.keymap.set("n", ",w", "<C-w>", { desc = "Close window" })
+
 local lsp_group = vim.api.nvim_create_augroup("native-lsp", { clear = true })
 vim.api.nvim_create_autocmd("LspAttach", {
   group = lsp_group,

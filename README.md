@@ -1,6 +1,6 @@
 # neovim-minimal
 
-Minimal Neovim config, Rocq/coq oriented.
+Minimal Neovim config.
 
 ## Install
 

@@ -120,15 +120,18 @@ vim.api.nvim_create_autocmd("LspAttach", {
     local client = vim.lsp.get_client_by_id(event.data.client_id)
     if not client then return end
 
-    -- Completion is owned by blink.cmp (configured below). Neovim's builtin LSP
-    -- completion source stays disabled so the two never compete.
+    -- Completion keys are owned by blink.cmp (see its setup below). Mapping
+    -- them here as well would shadow blink's own buffer-local insert mappings,
+    -- which is what left <C-n> unable to open the menu: it called
+    -- vim.lsp.completion.get() while no builtin completion source was enabled,
+    -- so it silently did nothing.
 
-    local function map(mode, lhs, rhs, desc, opts)
-      vim.keymap.set(mode, lhs, rhs, vim.tbl_extend("force", {
+    local function map(mode, lhs, rhs, desc)
+      vim.keymap.set(mode, lhs, rhs, {
         buffer = event.buf,
         silent = true,
         desc = desc,
-      }, opts or {}))
+      })
     end
 
     map("n", "gd", vim.lsp.buf.definition, "LSP: go to definition")
@@ -143,36 +146,8 @@ vim.api.nvim_create_autocmd("LspAttach", {
     map("n", "[d", function() vim.diagnostic.jump({ count = -1, float = true }) end, "Previous diagnostic")
     map("n", "]d", function() vim.diagnostic.jump({ count = 1, float = true }) end, "Next diagnostic")
     map("n", "<leader>e", vim.diagnostic.open_float, "Show diagnostic")
-
--- Cycle/accept completion. C-n and C-p drive the menu; Tab and S-Tab mirror
-    -- them so you can cycle without leaving home row. When no menu is open the
-    -- cycle keys fall through to their literal key so they stay usable in
-    -- strings, and C-n instead asks the LSP to open the menu.
-    local function cycle(when_open, literal, open_menu)
-      return function()
-        if vim.fn.pumvisible() == 1 then return when_open end
-        if open_menu then
-          vim.lsp.completion.get()
-          return ""
-        end
-        return literal
-      end
-    end
-
-    map("i", "<C-n>", cycle("<C-n>", "<C-n>", true), "Next completion")
-    map("i", "<C-p>", cycle("<C-p>", "<C-p>"), "Previous completion")
-    map("i", "<Tab>", cycle("<C-n>", "<Tab>"), "Select next completion")
-    map("i", "<S-Tab>", cycle("<C-p>", "<S-Tab>"), "Select previous completion")
-    map("i", "<CR>", function()
-      if vim.fn.pumvisible() == 1 and vim.fn.complete_info({ "selected" }).selected ~= -1 then
-        return "<C-y>"
-      end
-      return "<CR>"
-    end, "Confirm completion", { expr = true })
   end,
 })
-
-
 
 vim.lsp.config("rust_analyzer", {
   cmd = { "rust-analyzer" },
@@ -205,12 +180,25 @@ vim.lsp.enable("rust_analyzer")
 if has_blink then
   require("blink.cmp").setup({
     keymap = {
+      -- Keep blink's defaults (C-n/C-p select, C-y accept, C-space show,
+      -- C-e cancel, Up/Down) and override only what we want to change.
       preset = "default",
-      -- Tab / S-Tab also walk the menu. "fallback_to_mappings" defers when no
-      -- menu is showing, which is what lets Tab still jump between snippet
-      -- placeholders (rust-analyzer sends one tabstop per parameter).
-      ["<Tab>"] = { "select_next", "fallback_to_mappings" },
-      ["<S-Tab>"] = { "select_prev", "fallback_to_mappings" },
+      -- blink's own mappings are buffer-local, so nothing else may claim these
+      -- keys. Each entry is a chain: blink runs the first command that returns
+      -- true, then falls through to the literal key.
+      --
+      -- Tab cycles the menu while it is open, and otherwise walks snippet
+      -- placeholders, which is what makes a function's parameters fillable.
+      ["<Tab>"] = { "select_next", "snippet_forward", "fallback" },
+      ["<S-Tab>"] = { "select_prev", "snippet_backward", "fallback" },
+      -- Enter accepts only when there is something to accept; otherwise it
+      -- stays a newline. C-y is blink's own accept.
+      ["<CR>"] = {
+        function(cmp)
+          if cmp.is_visible() then return cmp.accept_and_enter() end
+        end,
+        "fallback",
+      },
     },
     appearance = { nerd_font_variant = "mono" },
     completion = { documentation = { auto_show = false } },

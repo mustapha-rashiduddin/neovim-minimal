@@ -107,11 +107,16 @@ end
 
 vim.keymap.set({ "n", "x" }, "<leader>s", leap_to_char, { desc = "Leap to character" })
 
--- <C-w> closes the window. <C-A-h> is not an option here: no byte sequence
--- encodes it, and a terminal sends ESC + 0x08, which Neovim reads as <Esc>
--- then <C-H>. st implements neither modifyOtherKeys nor the kitty keyboard
--- protocol, so Ctrl+Alt+letter can never be distinguished. Use the leader.
+-- <C-w> closes the window. <C-A-h> now works with fix_keyboard_input patch
+-- (CSI u / kitty keyboard protocol). st sends \033[104;7u for Ctrl+Alt+h.
 vim.keymap.set("n", ",w", "<C-w>", { desc = "Close window" })
+
+-- Emacs-style word erase: Alt+h works in st without patches (sends ESC+h)
+vim.keymap.set({ "n", "i" }, "<M-h>", "<C-w>", { desc = "Delete word backward (Alt+h)" })
+-- Ctrl+Alt+h requires fix_keyboard_input patch (CSI u protocol)
+vim.keymap.set({ "n", "i" }, "<C-A-h>", "<C-w>", { desc = "Delete word backward (Ctrl+Alt+h)" })
+vim.keymap.set({ "n", "i" }, ",h", "<C-w>", { desc = "Delete word backward (Emacs M-BS)" })
+vim.keymap.set({ "n", "i" }, ",d", "<C-o>dw", { desc = "Delete word forward (Emacs M-d)" })
 
 local lsp_group = vim.api.nvim_create_augroup("native-lsp", { clear = true })
 vim.api.nvim_create_autocmd("LspAttach", {

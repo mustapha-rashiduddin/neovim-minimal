@@ -107,16 +107,14 @@ end
 
 vim.keymap.set({ "n", "x" }, "<leader>s", leap_to_char, { desc = "Leap to character" })
 
--- <C-w> closes the window. <C-A-h> now works with fix_keyboard_input patch
--- (CSI u / kitty keyboard protocol). st sends \033[104;7u for Ctrl+Alt+h.
+-- <C-w> closes the window.
 vim.keymap.set("n", ",w", "<C-w>", { desc = "Close window" })
 
--- Emacs-style word erase: Alt+h works in st without patches (sends ESC+h)
-vim.keymap.set({ "n", "i" }, "<M-h>", "<C-w>", { desc = "Delete word backward (Alt+h)" })
--- Ctrl+Alt+h requires fix_keyboard_input patch (CSI u protocol)
-vim.keymap.set({ "n", "i" }, "<C-A-h>", "<C-w>", { desc = "Delete word backward (Ctrl+Alt+h)" })
-vim.keymap.set({ "n", "i" }, ",h", "<C-w>", { desc = "Delete word backward (Emacs M-BS)" })
-vim.keymap.set({ "n", "i" }, ",d", "<C-o>dw", { desc = "Delete word forward (Emacs M-d)" })
+-- fix_keyboard_input patch encodes XK_h/i/m for Ctrl+Alt (sends CSI u)
+-- neovim translates these to <M-BS>, <M-i>, <M-m> internally
+vim.keymap.set({ "n", "i" }, "<M-BS>", "<C-w>", { desc = "Delete word backward (Ctrl+Alt+h)" })
+-- vim.keymap.set({ "n", "i" }, "<M-i>", "<C-w>", { desc = "Delete word backward (Ctrl+Alt=i) — Emacs: completion-at-point" })
+-- vim.keymap.set({ "n", "i" }, "<M-m>", "<C-w>", { desc = "Delete word backward (Ctrl+Alt+m) — Emacs: indent-for-comment" })
 
 local lsp_group = vim.api.nvim_create_augroup("native-lsp", { clear = true })
 vim.api.nvim_create_autocmd("LspAttach", {
